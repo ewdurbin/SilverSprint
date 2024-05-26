@@ -46,7 +46,7 @@ namespace gfx {
         void setupVbos();
         ci::gl::VboMeshRef createVbo( float innerRad, float outerRad );
         
-        ci::gl::TextureRef  mBg, mDial, mLogo;
+        ci::gl::TextureRef  mBg, mDial, mLogo, mPBALogoPink, mPBALogoGreen;
         ci::vec2            mDialCenter;
         
         std::vector<RaceText*>  mRaceTexts;

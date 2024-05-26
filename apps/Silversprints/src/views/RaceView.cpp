@@ -21,6 +21,8 @@ void RaceView::setup()
 {
     mBg = gl::Texture::create( loadImage( loadAsset("img/bgGrad.png") ) );
     mLogo = gl::Texture::create( loadImage( loadAsset("img/opensprintsLogo.png") ) );
+    mPBALogoPink = gl::Texture::create( loadImage( loadAsset("img/PBA_pink_alpha.png") ) );
+    mPBALogoGreen = gl::Texture::create( loadImage( loadAsset("img/PBA_green_alpha.png") ) );
     
     mDialCenter = vec2(1920.0 * 0.5, 612.0);
     
@@ -188,6 +190,10 @@ void RaceView::draw()
     if( mLogo ){
         gl::color( 1, 1, 1, 1 );
         gl::draw( mLogo, vec2(1920, 1080) - vec2(50,50) - vec2(mLogo->getSize()) );
+    }
+    if ( mPBALogoPink ){
+        gl::color( 1, 1, 1, 1 );
+        gl::draw( mPBALogoPink, vec2(1920, 1080) - vec2(1388,50) - vec2(mPBALogoPink->getSize()) );
     }
     
     ci::ColorA tmpCol;
