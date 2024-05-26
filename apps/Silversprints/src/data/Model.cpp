@@ -14,8 +14,8 @@ using namespace std;
 using namespace gfx;
 
 Model::Model(){
-    playerColors[0] = ci::ColorA(185.0 / 255.0, 33.0 / 255.0, 64.0 / 255.0, 1.0);
-    playerColors[1] = ci::ColorA(28.0 / 255.0, 145.0 / 255.0, 133.0 / 255.0, 1.0);
+    playerColors[0] = ci::ColorA(112.0/255.0,191.0/255.0,68.0/255.0,1.0);
+    playerColors[1] = ci::ColorA(216.0/255.0,16.0/255.0,125.0/255.0,1.0);
     playerColors[2] = ci::ColorA(22.0 / 255.0, 146.0 / 255.0, 84.0 / 255.0, 1.0);
     playerColors[3] = ci::ColorA(225.0 / 255.0, 185.0 / 255.0, 9.0 / 255.0, 1.0);
 
