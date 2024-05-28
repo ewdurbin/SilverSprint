@@ -46,7 +46,7 @@ namespace gfx {
         void setupVbos();
         ci::gl::VboMeshRef createVbo( float innerRad, float outerRad );
         
-        ci::gl::TextureRef  mBg, mDial, mLogo, mPBALogoPink, mPBALogoGreen;
+        ci::gl::TextureRef  mBg, mDial, mLogo, mPBALogoPink, mPBMALogo;
         ci::vec2            mDialCenter;
         
         std::vector<RaceText*>  mRaceTexts;
@@ -56,7 +56,7 @@ namespace gfx {
         CountDownGfxRef         mCountDown;
         WinnerModalRef          mWinnerModal;
         
-        ci::gl::TextureFontRef  mTimerFont;
+        ci::gl::TextureFontRef  mTimerFont, mCreditFont;
         
         // center graphics
         std::vector<ci::gl::VboMeshRef> mVboList;

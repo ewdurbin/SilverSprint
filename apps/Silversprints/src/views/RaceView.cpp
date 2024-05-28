@@ -22,7 +22,7 @@ void RaceView::setup()
     mBg = gl::Texture::create( loadImage( loadAsset("img/bgGrad.png") ) );
     mLogo = gl::Texture::create( loadImage( loadAsset("img/opensprintsLogo.png") ) );
     mPBALogoPink = gl::Texture::create( loadImage( loadAsset("img/PBA_pink_alpha.png") ) );
-    mPBALogoGreen = gl::Texture::create( loadImage( loadAsset("img/PBA_green_alpha.png") ) );
+    mPBMALogo = gl::Texture::create( loadImage( loadAsset("img/PBMA-Logo.png") ) );
     
     mDialCenter = vec2(1920.0 * 0.5, 612.0);
     
@@ -40,6 +40,7 @@ void RaceView::setup()
     mStartStop.signalStartRace.connect( std::bind(&RaceView::onStartClicked, this ) );
     mStartStop.signalStopRace.connect( std::bind(&RaceView::onStopClicked, this ) );
     
+    mCreditFont = ci::gl::TextureFont::create( ci::Font(loadAsset("fonts/UbuntuMono-R.ttf"), 30.0) );
     mTimerFont = ci::gl::TextureFont::create( ci::Font(loadAsset("fonts/UbuntuMono-B.ttf"), 50.0) );
     
     reloadShader();
@@ -190,10 +191,17 @@ void RaceView::draw()
     if( mLogo ){
         gl::color( 1, 1, 1, 1 );
         gl::draw( mLogo, vec2(1920, 1080) - vec2(50,50) - vec2(mLogo->getSize()) );
+        mCreditFont->drawString( "Powered by", (vec2(1920, 1080) - vec2(50,60) - vec2(mLogo->getSize())), Model::instance().getTfDrawOpts() );
+
     }
     if ( mPBALogoPink ){
         gl::color( 1, 1, 1, 1 );
-        gl::draw( mPBALogoPink, vec2(1920, 1080) - vec2(1388,50) - vec2(mPBALogoPink->getSize()) );
+        gl::draw( mPBALogoPink, vec2(1920, 1080) - vec2(1488,30) - vec2(mPBALogoPink->getSize()) );
+    }
+    if ( mPBMALogo ){
+        gl::color( 1, 1, 1, 1);
+        gl::draw(mPBMALogo, vec2(1920, 1080) - vec2(350,40) - vec2(mPBMALogo->getSize()) );
+        mCreditFont->drawString( "Hardware from", (vec2(1920, 1080) - vec2(345,50) - vec2(mPBMALogo->getSize())), Model::instance().getTfDrawOpts() );
     }
     
     ci::ColorA tmpCol;
