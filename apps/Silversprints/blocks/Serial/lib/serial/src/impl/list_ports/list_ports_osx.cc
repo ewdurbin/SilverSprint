@@ -280,6 +280,20 @@ serial::list_ports(void)
     }
 
     IOObjectRelease(serial_port_iterator);
+
+    // Check for mock controller pty
+    const char* mock_port = "/tmp/mock_sprint_b";
+    if (access(mock_port, F_OK) == 0) {
+        char resolved[MAXPATHLEN];
+        if (realpath(mock_port, resolved)) {
+            PortInfo port_info;
+            port_info.port = resolved;
+            port_info.description = "Mock SilverSprint Controller";
+            port_info.hardware_id = "n/a";
+            devices_found.push_back(port_info);
+        }
+    }
+
     return devices_found;
 }
 

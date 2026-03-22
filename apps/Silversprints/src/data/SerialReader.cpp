@@ -82,13 +82,13 @@ void SerialReader::updateSerialThread()
 		
 		if(!bSerialConnected){ // We're diconnected, try to connect
 			if( reconnectSerialDevice() ){
-				mSendBuffer.clear();
+				{ std::string tmp; while( mSendBuffer.tryPopBack( &tmp ) ) {} }
 				
 				stopRace();
 				getVersion();
 
 				// is there a reason this is cleared after?
-				mReceiveBuffer.clear();
+				{ std::vector<std::string> tmp; while( mReceiveBuffer.tryPopBack( &tmp ) ) {} }
 				
 				bForceSerialDescUpdate = true;
 				CI_LOG_I("OpenSprints hardware found successfully. :: ") << mSerial->getPortName();

@@ -1,3 +1,4 @@
+#define _LIBCPP_ENABLE_CXX17_REMOVED_AUTO_PTR
 #if defined( __cplusplus )
 	#include "cinder/Cinder.h"
 	

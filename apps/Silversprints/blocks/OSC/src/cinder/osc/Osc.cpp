@@ -78,19 +78,20 @@ inline double ntohd( int64_t x ) { return (double) ntohll( x ); }
 //// MESSAGE
 
 Message::Message()
-: mIsCached( false )
+: mIsCached( false ), mSenderPort( 0 )
 {
 }
 	
 Message::Message( const std::string& address )
-: mAddress( address ), mIsCached( false )
+: mAddress( address ), mIsCached( false ), mSenderPort( 0 )
 {
 }
 	
 Message::Message( Message &&message ) NOEXCEPT
 : mAddress( move( message.mAddress ) ), mDataBuffer( move( message.mDataBuffer ) ),
 	mDataViews( move( message.mDataViews ) ), mIsCached( message.mIsCached ),
-	mCache( move( message.mCache ) ), mSenderIpAddress( move( message.mSenderIpAddress ) )
+	mCache( move( message.mCache ) ), mSenderIpAddress( move( message.mSenderIpAddress ) ),
+	mSenderPort( message.mSenderPort )
 {
 	for( auto & dataView : mDataViews ) {
 		dataView.mOwner = this;
@@ -106,6 +107,7 @@ Message& Message::operator=( Message &&message ) NOEXCEPT
 		mIsCached = message.mIsCached;
 		mCache = move( message.mCache );
 		mSenderIpAddress = move( message.mSenderIpAddress );
+		mSenderPort = message.mSenderPort;
 		for( auto & dataView : mDataViews ) {
 			dataView.mOwner = this;
 		}
@@ -117,7 +119,8 @@ Message::Message( const Message &message )
 : mAddress( message.mAddress ), mDataBuffer( message.mDataBuffer ),
 	mDataViews( message.mDataViews ), mIsCached( message.mIsCached ),
 	mCache( mIsCached ? new ByteBuffer( *(message.mCache) ) : nullptr ),
-	mSenderIpAddress( message.mSenderIpAddress )
+	mSenderIpAddress( message.mSenderIpAddress ),
+	mSenderPort( message.mSenderPort )
 {
 	for( auto & dataView : mDataViews ) {
 		dataView.mOwner = this;
@@ -133,6 +136,7 @@ Message& Message::operator=( const Message &message )
 		mIsCached = message.mIsCached;
 		mCache.reset( mIsCached ? new ByteBuffer( *(message.mCache) ) : nullptr );
 		mSenderIpAddress = message.mSenderIpAddress;
+		mSenderPort = message.mSenderPort;
 		for( auto & dataView : mDataViews ) {
 			dataView.mOwner = this;
 		}
@@ -308,7 +312,9 @@ void Message::append( const std::string& v )
 	mIsCached = false;
 	auto trailingZeros = getTrailingZeros( v.size() );
 	auto size = v.size() + trailingZeros;
-	mDataViews.emplace_back( this, ArgType::STRING, getCurrentOffset(), size );
+	CI_ASSERT_MSG( size <= std::numeric_limits<uint32_t>::max(),
+		"Argument size must fit in uint32_t" );
+	mDataViews.emplace_back( this, ArgType::STRING, getCurrentOffset(), static_cast<uint32_t>( size ) );
 	appendDataBuffer( v.data(), v.size(), trailingZeros );
 }
 	
@@ -318,7 +324,9 @@ void Message::append( const char *v )
 	auto stringLength = strlen( v );
 	auto trailingZeros = getTrailingZeros( stringLength );
 	auto size = stringLength + trailingZeros;
-	mDataViews.emplace_back( this, ArgType::STRING, getCurrentOffset(), size );
+	CI_ASSERT_MSG( size <= std::numeric_limits<uint32_t>::max(),
+		"Argument size must fit in uint32_t" );
+	mDataViews.emplace_back( this, ArgType::STRING, getCurrentOffset(), static_cast<uint32_t>( size ) );
 	appendDataBuffer( v, stringLength, trailingZeros );
 }
 
@@ -333,7 +341,9 @@ void Message::appendBlob( void* blob, uint32_t size )
 
 void Message::append( const ci::Buffer &buffer )
 {
-	appendBlob( (void*)buffer.getData(), buffer.getSize() );
+	CI_ASSERT_MSG( buffer.getSize() <= std::numeric_limits<uint32_t>::max(),
+		"Blob size must fit in uint32_t" );
+	appendBlob( (void*)buffer.getData(), static_cast<uint32_t>( buffer.getSize() ) );
 }
 
 void Message::appendTimeTag( uint64_t v )
@@ -414,7 +424,9 @@ void Message::createCache() const
 	
 	size_t typesArrayLen = typesArray.size();
 	ByteArray<4> sizeArray;
-	int32_t messageSize = addressLen + typesArrayLen + mDataBuffer.size();
+	CI_ASSERT_MSG( addressLen + typesArrayLen + mDataBuffer.size() <= std::numeric_limits<int32_t>::max(),
+		"Message size must fit in int32_t" );
+	int32_t messageSize = static_cast<int32_t>(addressLen + typesArrayLen + mDataBuffer.size());
 	auto endianSize = htonl( messageSize );
 	memcpy( sizeArray.data(), reinterpret_cast<uint8_t*>( &endianSize ), 4 );
 	
@@ -451,7 +463,7 @@ const Argument& Message::getDataView( uint32_t index ) const
 	return mDataViews[index];
 }
 	
-void Message::appendDataBuffer( const void *begin, uint32_t size, uint32_t trailingZeros )
+void Message::appendDataBuffer( const void *begin, size_t size, uint32_t trailingZeros )
 {
 	auto ptr = reinterpret_cast<const uint8_t*>( begin );
 	mDataBuffer.insert( mDataBuffer.end(), ptr, ptr + size );
@@ -863,7 +875,7 @@ std::ostream& operator<<( std::ostream &os, const Message &rhs )
 {
 	os << "Address: " << rhs.getAddress() << std::endl;
 	if( ! rhs.getSenderIpAddress().is_unspecified() )
-		os << "Sender Ip Address: " << rhs.getSenderIpAddress() << std::endl;
+		os << "Sender Ip Address: " << rhs.getSenderIpAddress() << " Port: " << rhs.getSenderPort() << std::endl;
 	for( auto &dataView : rhs.mDataViews )
 		os << "\t" << dataView << std::endl;
 	return os;
@@ -939,13 +951,13 @@ void SenderBase::send( const Bundle &bundle, OnErrorFn onErrorFn, OnCompleteFn o
 ////////////////////////////////////////////////////////////////////////////////////////
 //// SenderUdp
 
-SenderUdp::SenderUdp( uint16_t localPort, const std::string &destinationHost, uint16_t destinationPort, const protocol &protocol, asio::io_service &service )
+SenderUdp::SenderUdp( uint16_t localPort, const std::string &destinationHost, uint16_t destinationPort, const protocol &protocol, asio::io_context &service )
 : mSocket( new udp::socket( service ) ), mLocalEndpoint( protocol, localPort ),
-	mRemoteEndpoint( udp::endpoint( address::from_string( destinationHost ), destinationPort ) )
+	mRemoteEndpoint( udp::endpoint( asio::ip::make_address( destinationHost ), destinationPort ) )
 {
 }
 	
-SenderUdp::SenderUdp( uint16_t localPort, const protocol::endpoint &destination, const protocol &protocol, asio::io_service &service )
+SenderUdp::SenderUdp( uint16_t localPort, const protocol::endpoint &destination, const protocol &protocol, asio::io_context &service )
 : mSocket( new udp::socket( service ) ), mLocalEndpoint( protocol, localPort ),
 	mRemoteEndpoint( destination )
 {
@@ -1001,13 +1013,13 @@ void SenderUdp::closeImpl()
 ////////////////////////////////////////////////////////////////////////////////////////
 //// SenderTcp
 
-SenderTcp::SenderTcp( uint16_t localPort, const string &destinationHost, uint16_t destinationPort, const protocol &protocol, io_service &service, PacketFramingRef packetFraming )
+SenderTcp::SenderTcp( uint16_t localPort, const string &destinationHost, uint16_t destinationPort, const protocol &protocol, io_context &service, PacketFramingRef packetFraming )
 : mSocket( new tcp::socket( service ) ), mPacketFraming( packetFraming ), mLocalEndpoint( protocol, localPort ),
-	mRemoteEndpoint( tcp::endpoint( address::from_string( destinationHost ), destinationPort ) )
+	mRemoteEndpoint( tcp::endpoint( asio::ip::make_address( destinationHost ), destinationPort ) )
 {
 }
 	
-SenderTcp::SenderTcp( uint16_t localPort, const protocol::endpoint &destination, const protocol &protocol, io_service &service, PacketFramingRef packetFraming )
+SenderTcp::SenderTcp( uint16_t localPort, const protocol::endpoint &destination, const protocol &protocol, io_context &service, PacketFramingRef packetFraming )
 : mSocket( new tcp::socket( service ) ), mPacketFraming( packetFraming ), mLocalEndpoint( protocol, localPort ), mRemoteEndpoint( destination )
 {
 }
@@ -1129,7 +1141,19 @@ void ReceiverBase::removeListener( const std::string &address )
 		mListeners.erase( foundListener );
 }
 
-void ReceiverBase::dispatchMethods( uint8_t *data, uint32_t size, const asio::ip::address &senderIpAddress )
+void ReceiverBase::removeAllListeners()
+{
+	std::lock_guard<std::mutex> lock( mListenerMutex );
+	mListeners.clear();
+}
+
+ReceiverBase::Listeners ReceiverBase::getListeners() const
+{
+	std::lock_guard<std::mutex> lock( mListenerMutex );
+	return mListeners;
+}
+
+void ReceiverBase::dispatchMethods( uint8_t *data, uint32_t size, const asio::ip::address &senderIpAddress, uint16_t senderPort )
 {
 	std::vector<Message> messages;
 	decodeData( data, size, messages );
@@ -1142,6 +1166,7 @@ void ReceiverBase::dispatchMethods( uint8_t *data, uint32_t size, const asio::ip
 		bool dispatchedOnce = false;
 		auto &address = message.getAddress();
 		message.mSenderIpAddress = senderIpAddress;
+		message.mSenderPort = senderPort;
 		for( auto & listener : mListeners ) {
 			if( patternMatch( address, listener.first ) ) {
 				listener.second( message );
@@ -1298,12 +1323,12 @@ bool ReceiverBase::patternMatch( const std::string& lhs, const std::string& rhs 
 /////////////////////////////////////////////////////////////////////////////////////////
 //// ReceiverUdp
 	
-ReceiverUdp::ReceiverUdp( uint16_t port, const asio::ip::udp &protocol, asio::io_service &service )
+ReceiverUdp::ReceiverUdp( uint16_t port, const asio::ip::udp &protocol, asio::io_context &service )
 : mSocket( new udp::socket( service ) ), mLocalEndpoint( protocol, port ), mAmountToReceive( 4096 )
 {
 }
 
-ReceiverUdp::ReceiverUdp( const asio::ip::udp::endpoint &localEndpoint, asio::io_service &io )
+ReceiverUdp::ReceiverUdp( const asio::ip::udp::endpoint &localEndpoint, asio::io_context &io )
 : mSocket( new udp::socket( io ) ), mLocalEndpoint( localEndpoint ), mAmountToReceive( 4096 )
 {
 }
@@ -1358,7 +1383,9 @@ void ReceiverUdp::listen( OnSocketErrorFn onSocketErrorFn )
 			data[ bytesTransferred ] = 0;
 			istream stream( &mBuffer );
 			stream.read( reinterpret_cast<char*>( data.get() ), bytesTransferred );
-			dispatchMethods( data.get(), bytesTransferred, uniqueEndpoint->address() );
+			CI_ASSERT_MSG( bytesTransferred <= std::numeric_limits<uint32_t>::max(),
+				"Dispatch size must fit in uint32_t" );
+			dispatchMethods( data.get(), static_cast<uint32_t>( bytesTransferred ), uniqueEndpoint->address(), uniqueEndpoint->port() );
 		}
 		listen( std::move( onSocketErrorFn ) );
 	});
@@ -1463,20 +1490,22 @@ void ReceiverTcp::Connection::read()
 				dataSize = data->size() - 4;
 			}
 			
-			receiver->dispatchMethods( dataPtr, dataSize, mSocket->remote_endpoint().address() );
+			CI_ASSERT_MSG( dataSize <= std::numeric_limits<uint32_t>::max(),
+				"Dispatch size must fit in uint32_t" );
+			receiver->dispatchMethods( dataPtr, static_cast<uint32_t>( dataSize ), mSocket->remote_endpoint().address(), mSocket->remote_endpoint().port() );
 			
 			read();
 		}
 	});
 }
 
-ReceiverTcp::ReceiverTcp( uint16_t port, const protocol &protocol, asio::io_service &service, PacketFramingRef packetFraming )
+ReceiverTcp::ReceiverTcp( uint16_t port, const protocol &protocol, asio::io_context &service, PacketFramingRef packetFraming )
 : mAcceptor( new tcp::acceptor( service ) ), mPacketFraming( packetFraming ), mLocalEndpoint( protocol, port ),
 	mConnectionIdentifiers( 0 ), mIsShuttingDown( false )
 {
 }
 
-ReceiverTcp::ReceiverTcp( const protocol::endpoint &localEndpoint, asio::io_service &service, PacketFramingRef packetFraming )
+ReceiverTcp::ReceiverTcp( const protocol::endpoint &localEndpoint, asio::io_context &service, PacketFramingRef packetFraming )
 : mAcceptor( new tcp::acceptor( service ) ), mPacketFraming( packetFraming ), mLocalEndpoint( localEndpoint ),
 	mConnectionIdentifiers( 0 ), mIsShuttingDown( false )
 {
@@ -1515,7 +1544,7 @@ void ReceiverTcp::bindImpl()
 	if( ec )
 		throw osc::Exception( ec );
 	
-	mAcceptor->listen( socket_base::max_connections, ec );
+	mAcceptor->listen( socket_base::max_listen_connections, ec );
 	if( ec )
 		throw osc::Exception( ec );
 }
@@ -1525,7 +1554,7 @@ void ReceiverTcp::accept( OnAcceptErrorFn onAcceptErrorFn, OnAcceptFn onAcceptFn
 	if( ! mAcceptor || ! mAcceptor->is_open() )
 		return;
 	
-	auto socket = std::make_shared<tcp::socket>( mAcceptor->get_io_service() );
+	auto socket = std::make_shared<tcp::socket>( mAcceptor->get_executor() );
 	
 	mAcceptor->async_accept( *socket, std::bind(
 	[&, onAcceptErrorFn, onAcceptFn]( TcpSocketRef socket, const asio::error_code &error ) {
@@ -1600,7 +1629,7 @@ asio::error_code ReceiverTcp::closeConnection( uint64_t connectionIdentifier, as
 		return ec;
 	
 	std::lock_guard<std::mutex> lock( mConnectionMutex );
-	auto rem = remove_if( mConnections.begin(), mConnections.end(),
+	auto rem = find_if( mConnections.begin(), mConnections.end(),
 	[connectionIdentifier]( const UniqueConnection &cached ) {
 		return cached->mIdentifier == connectionIdentifier;
 	} );
@@ -1735,7 +1764,13 @@ void getDate( uint64_t ntpTime, uint32_t *year, uint32_t *month, uint32_t *day, 
 	// Convert to unix timestamp.
 	std::time_t sec_since_epoch = ( ntpTime - ( uint64_t( 0x83AA7E80 ) << 32 ) ) >> 32;
 	
-	auto tm = std::localtime( &sec_since_epoch );
+#ifdef CINDER_MSW
+	struct tm tm_buf{};
+	localtime_s( &tm_buf, &sec_since_epoch );
+	auto tm = &tm_buf;
+#else
+	auto tm = std::localtime(&sec_since_epoch);
+#endif // CINDER_MSW
 	if( year ) *year = tm->tm_year + 1900;
 	if( month ) *month = tm->tm_mon + 1;
 	if( day ) *day = tm->tm_mday;
@@ -1751,10 +1786,16 @@ std::string getClockString( uint64_t ntpTime, bool includeDate )
 	
 	char buffer[128];
 	
+#ifdef CINDER_MSW
+#define SPRINTF sprintf_s
+#else
+#define SPRINTF sprintf
+#endif // CINDER_MSW
+
 	if( includeDate )
-		sprintf( buffer, "%d/%d/%d %02d:%02d:%02d", month, day, year, hours, minutes, seconds );
+		SPRINTF( buffer, "%d/%d/%d %02d:%02d:%02d", month, day, year, hours, minutes, seconds );
 	else
-		sprintf( buffer, "%02d:%02d:%02d", hours, minutes, seconds );
+		SPRINTF( buffer, "%02d:%02d:%02d", hours, minutes, seconds );
 	
 	return std::string( buffer );
 }
