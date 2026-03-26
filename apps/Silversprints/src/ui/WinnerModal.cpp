@@ -80,8 +80,9 @@ void WinnerModal::update()
 {
 	double ct = getElapsedSeconds();
 	double dt = ct - lt;
-	mParticles->update(dt);
-	
+	if( bVisible ){
+		mParticles->update(dt);
+	}
 	lt = ct;
 }
 

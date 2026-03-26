@@ -111,6 +111,12 @@ void SerialReader::updateSerialThread()
 			else {
 				CI_LOG_W("Serial is not open");
 			}
+			auto rs = StateManager::instance().getCurrentRaceState();
+			if( rs != RACE_STATE::RACE_RUNNING && rs != RACE_STATE::RACE_COUNTDOWN_3 &&
+				rs != RACE_STATE::RACE_COUNTDOWN_2 && rs != RACE_STATE::RACE_COUNTDOWN_1 &&
+				rs != RACE_STATE::RACE_COUNTDOWN_GO ){
+				std::this_thread::sleep_for(std::chrono::milliseconds(16));
+			}
 		}
 	}
 }

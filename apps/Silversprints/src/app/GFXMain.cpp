@@ -55,6 +55,8 @@ void GFXMain::setup(){
     });
     
     mSerialReader->setup();
+
+    ci::app::setFrameRate(5.0);
 }
 
 void GFXMain::reloadShaders()
@@ -103,7 +105,15 @@ void GFXMain::onAppStateChanged( APP_STATE as ) {
 }
 
 void GFXMain::onRaceStateChanged( RACE_STATE rc ){
-    
+
+    if( rc == RACE_STATE::RACE_RUNNING || rc == RACE_STATE::RACE_STARTING ||
+        rc == RACE_STATE::RACE_COUNTDOWN_3 || rc == RACE_STATE::RACE_COUNTDOWN_2 ||
+        rc == RACE_STATE::RACE_COUNTDOWN_1 || rc == RACE_STATE::RACE_COUNTDOWN_GO ){
+        ci::app::setFrameRate(60.0);
+    }else{
+        ci::app::setFrameRate(5.0);
+    }
+
     if( rc == RACE_STATE::RACE_STARTING ){
         if(Model::instance().getCurrentRaceType() == Model::RACE_TYPE_DISTANCE ){
             mSerialReader->setRaceType(Model::RACE_TYPE_DISTANCE);
