@@ -21,6 +21,9 @@ void RaceView::setup()
 {
     mBg = gl::Texture::create( loadImage( loadAsset("img/bgGrad.png") ) );
     mLogo = gl::Texture::create( loadImage( loadAsset("img/opensprintsLogo.png") ) );
+    mStbLogo = gl::Texture::create( loadImage( loadAsset("img/stb_logo.png") ) );
+    mStbCircleLogo = gl::Texture::create( loadImage( loadAsset("img/stb_circle_logo.png") ) );
+    mStbWheel = gl::Texture::create( loadImage( loadAsset("img/stb_wheel.png") ) );
     
     mDialCenter = vec2(1920.0 * 0.5, 612.0);
     
@@ -150,6 +153,18 @@ void RaceView::draw()
     
     gl::drawSolidRect( Rectf( 834, 105, 834+260, 105+185 ) );    // big white rect
     gl::drawSolidRect( Rectf( 60, 133, 1870, 135 ) );            // white line
+
+    // STB logo - top left below line
+    if( mStbLogo ){
+        gl::color( 1, 1, 1, 1 );
+        Rectf logoArea(60, 155, 480, 275);
+        float scaleW = logoArea.getWidth() / mStbLogo->getWidth();
+        float scaleH = logoArea.getHeight() / mStbLogo->getHeight();
+        float s = min(scaleW, scaleH);
+        vec2 logoSize = vec2(mStbLogo->getWidth(), mStbLogo->getHeight()) * s;
+        vec2 logoPos = logoArea.getCenter() - logoSize * 0.5f;
+        gl::draw( mStbLogo, Rectf(logoPos, logoPos + logoSize) );
+    }
     
     // PLAYER INFO
     for( int i=0; i<Model::instance().getNumRacers(); i++){
@@ -182,6 +197,14 @@ void RaceView::draw()
     // DIAL
     gl::ScopedColor scW(1,1,1,1);
     gl::draw( mDial, vec2(mDial->getSize()) * vec2(-0.5) + mDialCenter );
+
+    // STB circle logo - center of dial
+    if( mStbCircleLogo ){
+        gl::color( 1, 1, 1, 1 );
+        float logoSize = 374;
+        Rectf logoRect(mDialCenter - vec2(logoSize * 0.5f), mDialCenter + vec2(logoSize * 0.5f));
+        gl::draw( mStbCircleLogo, logoRect );
+    }
     
     mStartStop.draw();
     
@@ -216,6 +239,14 @@ void RaceView::draw()
         
     }
     
+    // STB wheel - bottom left
+    if( mStbWheel ){
+        gl::color( 1, 1, 1, 1 );
+        float wheelSize = 250;
+        Rectf wheelRect(30, 1080 - 30 - wheelSize, 30 + wheelSize, 1080 - 30);
+        gl::draw( mStbWheel, wheelRect );
+    }
+
     // GRAPHICS
     mCountDown->draw();
     mWinnerModal->draw();
