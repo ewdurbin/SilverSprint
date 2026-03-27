@@ -27,7 +27,7 @@ void DropDown::setOptions(const std::vector<std::string> &opts )
 {
 	mOptions = opts;
 	mOptionsDisplay = opts;
-	vec2 drawerSize( getWidth(), min<float>( getHeight() * 3.0, getHeight() * opts.size()));
+	vec2 drawerSize( getWidth(), getHeight() * opts.size());
 	mDrawerRect = Rectf( getUpperLeft(), getUpperLeft() + drawerSize);
 }
 
@@ -88,7 +88,7 @@ void DropDown::onMouseMove(ci::app::MouseEvent event){
 	if(bOpen){
 		vec2 pos = Model::instance().localToGlobal(event.getPos());
 		if(mDrawerRect.contains(pos)){
-			mHighlight = (pos.y - mDrawerRect.y1) / getHeight();
+			mHighlight = ci::clamp((int)((pos.y - mDrawerRect.y1) / getHeight()), 0, (int)mOptions.size() - 1);
 		}else{
 			mHighlight = -1;
 		}
@@ -97,6 +97,7 @@ void DropDown::onMouseMove(ci::app::MouseEvent event){
 }
 
 void DropDown::setSelected(const int &num) {
+	if(num < 0 || num >= (int)mOptions.size()) return;
 	mSelectedIndex = num;
 	signalOnOptionSelect.emit(mOptions[num]);
 
